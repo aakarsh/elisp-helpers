@@ -25,8 +25,6 @@
 (defun an/string:trim (str)
   (an/string:rtrim (an/string:ltrim str)))
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; list helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -87,6 +85,9 @@
 ;; directory helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (require 'find-lisp)
+
+;; directory predicates
+(defalias 'an/dir:is-directory-p 'file-directory-p)
 
 (defalias  'an/file:find-files-recurse 'find-lisp-find-files)
 
