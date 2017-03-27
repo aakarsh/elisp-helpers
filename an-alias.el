@@ -106,6 +106,20 @@
      directory
      file-predicate
      directory-predicate)))
+
+(defun an/file:file-mv-extenstion(dir old-extension new-extension)
+  "Reersively move files "
+  (loop for file in (an/file:find-files-recurse  dir (format ".*%s" old-extension))
+        do
+        (let ((file-no-extension (file-name-sans-extension file)))
+          (shell-command (format "mv %s %s.%s" file file-no-extension new-extension)))))
+
+(defmacro an/file:for-each-subdir(directory regexp &rest body )
+  `(loop for file in (an/file:find-subdir ,directory ,regexp)
+         do
+         (let ((default-directory file))
+           ,@body)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shell helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
