@@ -156,6 +156,14 @@
          (let ((default-directory file))
            ,@body)))
 
+(defun an/file:map-over-file(input-file f)
+  (with-temp-buffer
+    (insert-file-contents input-file t)
+    (goto-char 0)
+    (loop with num-lines = (an/buffer:num-lines)
+          for current-line in (g/fetch-lines num-lines)
+          for i = 0 then (+ i 1) do
+          (funcall  f i current-line))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shell helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -226,4 +234,25 @@
 (defun table/swap-rows(table r1 r2)
   (loop for c from 0 below (g/table-ncols table) do
         (an/swapf (table/at table r1 c) (table/at table r2 c))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Graphs - some collections of graph helpers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Adjacency Matrix Helpers
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun matrix-graph/make(size)
+  "Simple two dimensional table representing adjacency matrix"
+  (table/make size size nil))
+
+(defun matrix-graph/reverse(graph size)
+  "Reverse a adjacency matrix for a graph "
+  (loop
+   with new-graph = (table/make size size nil)
+   finally (return new-graph)
+   for row from 0 below (table/nrows  graph) do
+   (loop for col below  (table/ncols graph) do
+         (if (table/at graph row col)
+             (table/setf new-graph col row t)))))
+
+(provide 'an-alias)
 
