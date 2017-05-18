@@ -1,3 +1,4 @@
+(require 'cl)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; string helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -161,7 +162,7 @@
     (insert-file-contents input-file t)
     (goto-char 0)
     (loop with num-lines = (an/buffer:num-lines)
-          for current-line in (g/fetch-lines num-lines)
+          for current-line in (an/buffer:fetch-lines num-lines)
           for i = 0 then (+ i 1) do
           (funcall  f i current-line))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -250,9 +251,20 @@
    with new-graph = (table/make size size nil)
    finally (return new-graph)
    for row from 0 below (table/nrows  graph) do
-   (loop for col below  (table/ncols graph) do
+   (loop for col below  (table/ncols graph)  do
          (if (table/at graph row col)
              (table/setf new-graph col row t)))))
 
-(provide 'an-alias)
+(defstruct graph/node
+  number
+  (component nil)
+  (visited nil)
+  (start-time -1)
+  (finish-time -1))
 
+
+(defun graph/make-nodes(num)
+  "Returns a vector of sat/nodes with increasing sequence numbers "
+  (g/make-vector num (lambda(i) (make-sat/node :number i))))
+
+(provide 'an-lib)
