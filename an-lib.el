@@ -53,6 +53,16 @@
 ;; buffer helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+(defun g/vector-list(ls)
+  (loop with v = (make-vector (length ls) 0)
+        for l in ls 
+        for i = 0 then (+ i 1)
+        do (aset v i l)
+        finally (return v)))
+
+
+
 (defun an/buffer:clear-current-buffer()
   (an/buffer:clear (current-buffer)))
 
@@ -196,7 +206,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; vectors - helpers for dealing with vectors
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun an/vector:make(length constructor)
+  (let ((retval (make-vector length nil)))
+    (loop for i from 0 below length do
+          (aset  retval i (funcall constructor i)))
+    retval))
 
+(defun an/buffer:line-to-numbers(line)
+  (an/vector-list
+   (mapcar 'string-to-number
+           (split-string line " "))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; table - helpers for two dimension vector.
@@ -261,7 +280,6 @@
   (visited nil)
   (start-time -1)
   (finish-time -1))
-
 
 (defun graph/make-nodes(num)
   "Returns a vector of sat/nodes with increasing sequence numbers "
