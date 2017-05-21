@@ -321,9 +321,7 @@ exhaustion, assumes node is vector."
         (if (not (an/graph:node-visited node))
             (progn
               (message "Call dfs-visit :" (an/graph:node-number node))
-              (an/graph:dfs-visit graph nodes node
-                             :pre-visit pre-vist
-                             :post-visit post-visit)
+              (an/graph:dfs-visit graph nodes node :pre-visit pre-vist :post-visit post-visit)
               (if post-dfs
                   (funcall post-dfs graph nodes node)))))
   (an/graph:nodes-clear-visited nodes))
@@ -355,6 +353,14 @@ after visiting `node`. "
           do
           (an/graph:dfs-visit graph nodes node :post-visit post-visit :pre-visit  pre-visit)
           (setf (an/graph:node-visited node) 'visited))))
+
+(defun an/graph:dfs-post-order (graph nodes)
+  "Computes the ordering of nodes, from last to finish to first to finish"
+  (let ((node-finish-order '()))
+    (an/graph:dfs-visit-graph graph nodes
+                         :post-visit (lambda (graph nodes node)
+                                       (push node node-finish-order)))
+    (an/vector-list node-finish-order)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency List Implementations
