@@ -305,6 +305,57 @@ then (j,i) is an edge in reverse(G)"
   "Returns a vector of sat/nodes with increasing sequence numbers "
   (g/make-vector num (lambda(i) (make-sat/node :number i))))
 
+(defun an/graph:nodes-clear-visited (nodes)
+  "Mark all nodes as unvisited."
+  (loop for node across nodes do
+        (setf (an/graph:node-visited node) nil)))
+
+(cl-defun an/graph:dfs-visit-graph (graph nodes  &key (traverse-order nil) (post-dfs nil) (pre-vist nil) (post-visit nil))
+  "Visit a complete graph using dfs. Restarting on each
+exhaustion, assumes node is vector."
+  (an/graph:nodes-clear-visited nodes)
+  (loop for node across
+        (if traverse-order
+            traverse-order  nodes)
+        do
+        (if (not (an/graph:node-visited node))
+            (progn
+              (message "Call dfs-visit :" (an/graph:node-number node))
+              (an/graph:dfs-visit graph nodes node
+                             :pre-visit pre-vist
+                             :post-visit post-visit)
+              (if post-dfs
+                  (funcall post-dfs graph nodes node)))))
+  (an/graph:nodes-clear-visited nodes))
+
+
+(cl-defun an/graph:dfs-visit(graph nodes node  &key (pre-visit nil) (post-visit nil))
+  "Runs dfs on a `graph' represented by and adjaceny matrix of
+vectors, `nodes' is a of nodes containing auxiliary information
+about graph nodes. `node' is the node to visit. `pre-vist' and
+`post-visit' are optional key word callbacks called before and
+after visiting `node`. "
+  (message "an/graph:dfs-visit:call %d" (an/graph:node-number node))
+  (let* ((node-num (an/graph:node-number node))
+         (initial-node node))
+    ;; mark called-node as visiting
+    (setf (an/graph:node-visited node) 'visiting)
+    (if pre-visit
+        (progn
+          (funcall pre-visit graph nodes node)))
+    (loop for node in (matrix-graph/neighbours initial-node graph nodes)     
+          finally
+          (progn
+            (message "Finished Visiting : %d , %s" (an/graph:node-number initial-node) initial-node)
+            (setf (an/graph:node-visited initial-node) 'visited)
+            (if post-visit
+                (funcall post-visit graph nodes initial-node)))
+          
+          if (not (an/graph:node-visited node))
+          do
+          (an/graph:dfs-visit graph nodes node :post-visit post-visit :pre-visit  pre-visit)
+          (setf (an/graph:node-visited node) 'visited))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency List Implementations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
