@@ -257,6 +257,24 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graphs - some collections of graph helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defstruct an/graph
+  (nodes nil)
+  (type nil)   ;; condition on type of graph
+  (matrix nil) ;; an adjacency matrix representation
+  (adj-list )) ;; an adjacency list   representation  
+
+
+(defstruct an/graph:node
+  number
+  (neighbours nil)
+  (data nil)
+  (component nil)
+  (visited nil)
+  (start-time -1)
+  (finish-time -1))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency Matrix Helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun matrix-graph/make(size)
@@ -275,16 +293,22 @@ then (j,i) is an edge in reverse(G)"
          (if (table/at graph row col)
              (table/setf new-graph col row t)))))
 
-(defstruct graph/node
-  number
-  (component nil)
-  (visited nil)
-  (start-time -1)
-  (finish-time -1))
+(defun matrix-graph/neighbours(node graph nodes)
+  "Retrun a vector of neighbours of node."
+  (loop for neighbours-p across (aref graph (an/graph:node-number node))
+        for pos = 0 then (+  pos 1) 
+        if neighbours-p collect (aref nodes pos)))
+  
+
 
 (defun graph/make-nodes(num)
   "Returns a vector of sat/nodes with increasing sequence numbers "
   (g/make-vector num (lambda(i) (make-sat/node :number i))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Adjacency List Implementations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun edge-graph/make(size)
+  (an/vector-list size nil))
+
 (provide 'an-lib)
