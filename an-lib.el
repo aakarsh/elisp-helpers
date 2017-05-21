@@ -274,6 +274,39 @@
   (start-time -1)
   (finish-time -1))
 
+(defun an/graph:make-nodes(num)
+  "Returns a vector of sat/nodes with increasing sequence numbers "
+  (an/vector:make num (lambda(i) (make-an/graph:node :number i))))
+
+(defun an/graph-component-graph(g num-components)
+  (let ((nodes (an/graph-nodes g))
+        (graph (an/graph-matrix g)))
+  (make-an/graph
+   :matrix (an/graph-make-component-graph nodes graph num-components)
+   :nodes (an/graph-make-component-nodes nodes num-components))))
+
+(defun an/graph-make-component-graph(nodes graph num-components)
+  "A component graph is a directed acyclic graph which summarises
+the original graph containing one vertex per strongly connected
+component in the graph."
+  (let ((component-graph (table/make num-components num-components nil)))
+    (loop for i from 0 below (table/nrows graph )
+          for i-cmp =  (an/graph:node-component (aref nodes i)) do
+          (loop for j from 0 below (table/ncols graph)
+                for j-cmp =  (an/graph:node-component (aref nodes j)) do
+                ;; change component number to index
+                (if (and  (table/at graph i j)   (not (eq i-cmp j-cmp)))
+                    (table/setf component-graph i-cmp j-cmp t))))
+    component-graph))
+
+(defun an/graph-make-component-nodes(nodes num-components)
+  (let ((component-nodes (an/graph:make-nodes num-components)))
+    (loop for node across nodes
+          for component-number = (an/graph:node-component node)
+          for component = (aref component-nodes component-number ) do
+          (push node (an/graph:node-data component)))
+    component-nodes))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency Matrix Helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -359,20 +392,21 @@ after visiting `node`. "
                                        (push node node-finish-order)))
     (an/vector-list node-finish-order)))
 
-
-(defun an/graph:assign-components(graph nodes)
+(defun an/graph:assign-components(g)
   "Find all the strongly connected components:
 1. Perform DFS on the graph, compute the completion order of each
 node.
 2. Starting from first finished , Perform DFS assigning same
 component numbers till each component is exhausted.
 3. Returns the number of components found."
-  (lexical-let ((cur-component-number 0)
+  (lexical-let* ((nodes (an/graph-nodes g))
+                (graph (an/graph-matrix g))
+                (cur-component-number 0)
                 (dfs-post-order (an/graph:dfs-post-order graph nodes)))
-
     ;; Redo dfs this time going through reverse graph in node finish order
     (message "******Start Computing Component Number ********** ")
     (an/graph:dfs-visit-graph
+     ;; TODO: fix assumes graph type.
      (matrix-graph/reverse graph) nodes
      :traverse-order dfs-post-order
      :post-visit (lambda (graph nds nd)
@@ -381,7 +415,6 @@ component numbers till each component is exhausted.
      :post-dfs (lambda (graph nodes node)
                  (incf cur-component-number)))
     cur-component-number))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency List Implementations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
