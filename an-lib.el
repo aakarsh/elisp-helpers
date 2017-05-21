@@ -298,8 +298,6 @@ then (j,i) is an edge in reverse(G)"
   (loop for neighbours-p across (aref graph (an/graph:node-number node))
         for pos = 0 then (+  pos 1) 
         if neighbours-p collect (aref nodes pos)))
-  
-
 
 (defun graph/make-nodes(num)
   "Returns a vector of sat/nodes with increasing sequence numbers "
@@ -325,7 +323,6 @@ exhaustion, assumes node is vector."
               (if post-dfs
                   (funcall post-dfs graph nodes node)))))
   (an/graph:nodes-clear-visited nodes))
-
 
 (cl-defun an/graph:dfs-visit(graph nodes node  &key (pre-visit nil) (post-visit nil))
   "Runs dfs on a `graph' represented by and adjaceny matrix of
@@ -361,6 +358,29 @@ after visiting `node`. "
                          :post-visit (lambda (graph nodes node)
                                        (push node node-finish-order)))
     (an/vector-list node-finish-order)))
+
+
+(defun an/graph:assign-components(graph nodes)
+  "Find all the strongly connected components:
+1. Perform DFS on the graph, compute the completion order of each
+node.
+2. Starting from first finished , Perform DFS assigning same
+component numbers till each component is exhausted.
+3. Returns the number of components found."
+  (lexical-let ((cur-component-number 0)
+                (dfs-post-order (an/graph:dfs-post-order graph nodes)))
+
+    ;; Redo dfs this time going through reverse graph in node finish order
+    (message "******Start Computing Component Number ********** ")
+    (an/graph:dfs-visit-graph
+     (matrix-graph/reverse graph) nodes
+     :traverse-order dfs-post-order
+     :post-visit (lambda (graph nds nd)
+                   (setf (an/graph:node-component nd) cur-component-number)
+                   (message "assign-components : %d component: %d" (an/graph:node-number nd) (an/graph:node-component nd)))
+     :post-dfs (lambda (graph nodes node)
+                 (incf cur-component-number)))
+    cur-component-number))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency List Implementations
