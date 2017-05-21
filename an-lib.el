@@ -258,15 +258,16 @@
 ;; Graphs - some collections of graph helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency Matrix Helpers
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun matrix-graph/make(size)
   "Simple two dimensional table representing adjacency matrix"
   (table/make size size nil))
 
-(defun matrix-graph/reverse(graph size)
-  "Reverse a adjacency matrix for a graph "
+(defun matrix-graph/reverse(graph )
+  "Create a reverse graph such that if (i,j) is edge in G
+then (j,i) is an edge in reverse(G)"
   (loop
+   with size = (length graph)
    with new-graph = (table/make size size nil)
    finally (return new-graph)
    for row from 0 below (table/nrows  graph) do
@@ -285,4 +286,5 @@
   "Returns a vector of sat/nodes with increasing sequence numbers "
   (g/make-vector num (lambda(i) (make-sat/node :number i))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (provide 'an-lib)
