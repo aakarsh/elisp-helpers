@@ -307,6 +307,11 @@ component in the graph."
           (push node (an/graph:node-data component)))
     component-nodes))
 
+(defun an/graph-neighbours(graph node)
+  (if (an/graph-matrix graph)
+      (matrix-graph/neighbours node
+                               (an/graph-matrix graph)
+                               (an/graph-nodes graph)))) 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency Matrix Helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
