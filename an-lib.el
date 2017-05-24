@@ -1,4 +1,5 @@
 (require 'cl)
+(require 'dash)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; string helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -26,6 +27,13 @@
 (defun an/string:trim (str)
   (an/string:rtrim (an/string:ltrim str)))
 
+
+(defun an/string:split (str &optional sep omit-nulls trim)
+  (if (not sep)
+      (setf  sep "\\s+"))
+   (split-string str sep omit-nulls trim))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; list helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -34,7 +42,7 @@
       (while (< count pos)
             (setq first (append first (list (car second))))
             (setq second (cdr second))
-            (setq count (+ count 1)))      
+            (setq count (+ count 1)))
       (list first second)))
 
 (defun an/list:join(lst)
@@ -44,8 +52,8 @@
   "Filter a list using a predicate"
   (if (not l)
       '()
-    (if (funcall fn (car l))                 
-        (cons (car l) 
+    (if (funcall fn (car l))
+        (cons (car l)
               (an/list:filter fn (cdr l)))
       (an/list:filter fn (cdr l)))))
 
@@ -56,7 +64,7 @@
 
 (defun g/vector-list(ls)
   (loop with v = (make-vector (length ls) 0)
-        for l in ls 
+        for l in ls
         for i = 0 then (+ i 1)
         do (aset v i l)
         finally (return v)))
@@ -97,15 +105,10 @@
         (reg-end nil))
   (save-excursion
     (goto-char (line-beginning-position))
-    (setf reg-begin (point)) 
+    (setf reg-begin (point))
     (forward-line n)
     (goto-char (line-end-position))
-    (setf reg-end (point))
-    ;; AN - 5/14
-    ;;    (if (equal (point) reg-begin)
-    ;;        (setf reg-end (line-end-position))
-    ;;      (setf reg-end (point))
-    )
+    (setf reg-end (point)))
   (forward-line n) ;; change buffer state so curser is n-lines ahead
   (let ((region (buffer-substring-no-properties reg-begin reg-end)))
     (split-string region "\n" t))))
@@ -117,11 +120,14 @@
   (count-lines (point-min) (point-max)))
 
 (defun an/vector-list(ls)
+  "Converts a list of objects to a vector of objects."
   (loop with v = (make-vector (length ls) 0)
-        for l in ls 
+        for l in ls
         for i = 0 then (+ i 1)
         do (aset v i l)
         finally (return v)))
+
+
 
 (defun an/buffer:fetch-lines-as-numbers()
   (an/vector-list
@@ -175,6 +181,8 @@
           for current-line in (an/buffer:fetch-lines num-lines)
           for i = 0 then (+ i 1) do
           (funcall  f i current-line))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shell helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -262,12 +270,12 @@
   (nodes nil)
   (type nil)   ;; condition on type of graph
   (matrix nil) ;; an adjacency matrix representation
-  (adj-list )) ;; an adjacency list   representation  
+  (adj-list )) ;; an adjacency list   representation
 
 
 (defstruct an/graph:node
   number
-  (neighbours nil)
+  ;; (neighbours nil) use external ds for these
   (data nil)
   (component nil)
   (visited nil)
@@ -309,9 +317,15 @@ component in the graph."
 
 (defun an/graph-neighbours(graph node)
   (if (an/graph-matrix graph)
-      (matrix-graph/neighbours node
-                               (an/graph-matrix graph)
-                               (an/graph-nodes graph)))) 
+      (matrix-graph/neighbours node (an/graph-matrix graph) (an/graph-nodes graph))
+    (edge-graph/neighbours node (an/graph-adj-list graph))))
+
+(defun an/graph-reverse (g)
+  (if (an/graph-matrix g)
+      (setf (an/graph-matrix g) (matrix-graph/reverse (an/graph-matrix g)))
+    (setf (an/graph-adj-list g) (edge-graph/reverse (an/graph-adj-list g)))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency Matrix Helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -334,7 +348,7 @@ then (j,i) is an edge in reverse(G)"
 (defun matrix-graph/neighbours(node graph nodes)
   "Retrun a vector of neighbours of node."
   (loop for neighbours-p across (aref graph (an/graph:node-number node))
-        for pos = 0 then (+  pos 1) 
+        for pos = 0 then (+  pos 1)
         if neighbours-p collect (aref nodes pos)))
 
 (defun graph/make-nodes(num)
@@ -346,54 +360,59 @@ then (j,i) is an edge in reverse(G)"
   (loop for node across nodes do
         (setf (an/graph:node-visited node) nil)))
 
-(cl-defun an/graph:dfs-visit-graph (graph nodes  &key (traverse-order nil) (post-dfs nil) (pre-vist nil) (post-visit nil))
+(cl-defun an/graph:dfs-visit-graph (g  &key (traverse-order nil) (post-dfs nil) (pre-vist nil) (post-visit nil))
   "Visit a complete graph using dfs. Restarting on each
 exhaustion, assumes node is vector."
-  (an/graph:nodes-clear-visited nodes)
-  (loop for node across
-        (if traverse-order
-            traverse-order  nodes)
-        do
-        (if (not (an/graph:node-visited node))
-            (progn
-              (message "Call dfs-visit :" (an/graph:node-number node))
-              (an/graph:dfs-visit graph nodes node :pre-visit pre-vist :post-visit post-visit)
-              (if post-dfs
-                  (funcall post-dfs graph nodes node)))))
-  (an/graph:nodes-clear-visited nodes))
+  (let ((nodes (an/graph-nodes g)))        
+    (an/graph:nodes-clear-visited nodes)
+    (loop for node across
+          (if traverse-order
+              traverse-order  nodes)
+          do
+          (if (not (an/graph:node-visited node))
+              (progn
+                (message "Call dfs-visit :" (an/graph:node-number node))
+                (an/graph:dfs-visit g node :pre-visit pre-vist :post-visit post-visit)
+                (if post-dfs
+                    (funcall post-dfs g node)))))
+    (an/graph:nodes-clear-visited nodes)))
 
-(cl-defun an/graph:dfs-visit(graph nodes node  &key (pre-visit nil) (post-visit nil))
+
+(cl-defun an/graph:dfs-visit(g  node  &key (pre-visit nil) (post-visit nil))
   "Runs dfs on a `graph' represented by and adjaceny matrix of
 vectors, `nodes' is a of nodes containing auxiliary information
 about graph nodes. `node' is the node to visit. `pre-vist' and
 `post-visit' are optional key word callbacks called before and
 after visiting `node`. "
-  (message "an/graph:dfs-visit:call %d" (an/graph:node-number node))
-  (let* ((node-num (an/graph:node-number node))
+  (let ((nodes (an/graph-nodes g)))
+    (message "an/graph:dfs-visit:call %d" (an/graph:node-number node))
+      (let* ((node-num (an/graph:node-number node))
          (initial-node node))
     ;; mark called-node as visiting
     (setf (an/graph:node-visited node) 'visiting)
     (if pre-visit
         (progn
-          (funcall pre-visit graph nodes node)))
-    (loop for node in (matrix-graph/neighbours initial-node graph nodes)     
+          (funcall pre-visit g  node)))
+    (loop for node in (an/graph-neighbours g initial-node)
+          ;;(matrix-graph/neighbours initial-node graph nodes)
           finally
           (progn
             (message "Finished Visiting : %d , %s" (an/graph:node-number initial-node) initial-node)
             (setf (an/graph:node-visited initial-node) 'visited)
             (if post-visit
-                (funcall post-visit graph nodes initial-node)))
-          
+                (funcall post-visit g initial-node)))
+
           if (not (an/graph:node-visited node))
           do
-          (an/graph:dfs-visit graph nodes node :post-visit post-visit :pre-visit  pre-visit)
-          (setf (an/graph:node-visited node) 'visited))))
+          (an/graph:dfs-visit g node :post-visit post-visit :pre-visit  pre-visit)
+          (setf (an/graph:node-visited node) 'visited)))))
 
-(defun an/graph:dfs-post-order (graph nodes)
+
+(defun an/graph:dfs-post-order (g)
   "Computes the ordering of nodes, from last to finish to first to finish"
   (let ((node-finish-order '()))
-    (an/graph:dfs-visit-graph graph nodes
-                         :post-visit (lambda (graph nodes node)
+    (an/graph:dfs-visit-graph g
+                         :post-visit (lambda (g node)
                                        (push node node-finish-order)))
     (an/vector-list node-finish-order)))
 
@@ -404,26 +423,61 @@ node.
 2. Starting from first finished , Perform DFS assigning same
 component numbers till each component is exhausted.
 3. Returns the number of components found."
-  (lexical-let* ((nodes (an/graph-nodes g))
-                (graph (an/graph-matrix g))
-                (cur-component-number 0)
-                (dfs-post-order (an/graph:dfs-post-order graph nodes)))
+  (lexical-let* ((cur-component-number 0)
+                 (dfs-post-order (an/graph:dfs-post-order g)))
+    
     ;; Redo dfs this time going through reverse graph in node finish order
     (message "******Start Computing Component Number ********** ")
-    (an/graph:dfs-visit-graph
-     ;; TODO: fix assumes graph type.
-     (matrix-graph/reverse graph) nodes
+    (an/graph-reverse g)
+    (an/graph:dfs-visit-graph g
      :traverse-order dfs-post-order
-     :post-visit (lambda (graph nds nd)
+     :post-visit (lambda (g nd)
                    (setf (an/graph:node-component nd) cur-component-number)
                    (message "assign-components : %d component: %d" (an/graph:node-number nd) (an/graph:node-component nd)))
-     :post-dfs (lambda (graph nodes node)
+     :post-dfs (lambda (g node)
                  (incf cur-component-number)))
+     ;; return graph to original state.
+    (an/graph-reverse g)
     cur-component-number))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency List Implementations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun edge-graph/make(size)
-  (an/vector-list size nil))
+  "Constructs a graph represented as list of edge lists "
+  (make-vector size nil))
+
+(defun an/edge-graph:add-directed-edge (eg i j)
+  (push j (aref eg i)))
+
+(defun an/edge-graph:add-undirected-edge (eg i j)
+  (an/edge-graph:add-directed-edge eg i j)
+  (an/edge-graph:add-directed-edge eg j i))
+
+(defun an/edge-graph:parse-edges (relations)
+  "Parse relation lists into a directed adjanceny list :
+eg.  '([1 2] [2 3])."  
+  (let* ((max-vertex
+         (loop for rel in relations
+               for first-vertex = (aref rel 0)
+               for second-vertex = (aref rel 1)
+               maximize (max first-vertex second-vertex)))
+         (num-vertex max-vertex)
+         (graph      (edge-graph/make num-vertex)))
+    (loop for rel in relations
+          for first-vertex  = (-  (aref rel 0) 1)
+          for second-vertex = (-  (aref rel 1) 1)
+          do
+          (an/edge-graph:add-undirected-edge graph first-vertex second-vertex))
+    graph))
+
+(defun edge-graph/neighbours (node edge-graph nodes)
+  (loop  with node-number = (an/graph:node-number node)
+         for neighbour in (aref edge-graph node-number)
+         collect (aref nodes neighbour)))
+
+(defun edge-graph/reverse (graph)
+  (error "Not impelemnted"))
+
 
 (provide 'an-lib)
