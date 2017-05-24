@@ -1,5 +1,6 @@
 (require 'cl)
 (require 'dash)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; string helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -60,16 +61,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; buffer helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 (defun g/vector-list(ls)
   (loop with v = (make-vector (length ls) 0)
         for l in ls
         for i = 0 then (+ i 1)
         do (aset v i l)
         finally (return v)))
-
-
 
 (defun an/buffer:clear-current-buffer()
   (an/buffer:clear (current-buffer)))
@@ -181,8 +178,6 @@
           for current-line in (an/buffer:fetch-lines num-lines)
           for i = 0 then (+ i 1) do
           (funcall  f i current-line))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shell helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -262,16 +257,15 @@
 (defun table/swap-rows(table r1 r2)
   (loop for c from 0 below (g/table-ncols table) do
         (an/swapf (table/at table r1 c) (table/at table r2 c))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graphs - some collections of graph helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defstruct an/graph
   (nodes nil)
   (type nil)   ;; condition on type of graph
   (matrix nil) ;; an adjacency matrix representation
   (adj-list )) ;; an adjacency list   representation
-
 
 (defstruct an/graph:node
   number
@@ -282,6 +276,54 @@
   (start-time -1)
   (finish-time -1))
 
+(defun an/relations:max-member (relations)
+  "Returns the maximum vertex in list of relations a list of two
+element vectors."
+  (loop for rel in relations
+        for first-vertex = (aref rel 0)
+        for second-vertex = (aref rel 1)
+        maximize (max first-vertex second-vertex)))
+
+(defun an/graph:make(type num-vertices relations )
+  "Construct a graph with underlying data structure to use
+sepcified by type 'matrix 'adj-list. Relations are specified as
+a list of vector pairs of vertices."
+  (let ((g
+         (make-an/graph
+          :type type
+          :nodes (an/graph:make-nodes num-vertices))))
+    (an/graph:init-edge g)    
+    (loop for rel in relations
+          for first-vertex  = (aref rel 0) ;;(-  (aref rel 0) 1)
+          for second-vertex = (aref rel 1) ;;(-  (aref rel 1) 1)
+          do
+          (an/graph:add-directed-edge g first-vertex second-vertex))
+    g))
+
+(defun an/graph:add-directed-edge (graph i j )
+  (cond
+   ((eq (an/graph-type graph) 'adj-list)
+    (an/edge-graph:add-directed-edge graph i j))
+   ((eq (an/graph-type graph) 'matrix )
+    (matrix-graph:add-directed-edge graph i j))))
+
+(defun an/graph:add-undirected-edge (graph i j )
+  (cond
+   ((eq (an/graph-type graph) 'adj-list)
+    (an/edge-graph:add-undirected-edge graph i j))
+   ((eq (an/graph-type graph) 'matrix )
+    (matrix-graph:add-undirected-edge graph i j))))
+
+(defun an/graph:init-edge (graph )
+  (cond
+   ((eq (an/graph-type graph) 'adj-list)
+    (setf (an/graph-adj-list graph)
+          (edge-graph/make (length (an/graph-nodes graph)))))
+      
+   ((eq (an/graph-type graph) 'matrix )
+    (setf (an/graph-matrix graph )
+          (matrix-graph/make (length (an/graph-nodes graph)))))))
+
 (defun an/graph:make-nodes(num)
   "Returns a vector of sat/nodes with increasing sequence numbers "
   (an/vector:make num (lambda(i) (make-an/graph:node :number i))))
@@ -289,9 +331,10 @@
 (defun an/graph-component-graph(g num-components)
   (let ((nodes (an/graph-nodes g))
         (graph (an/graph-matrix g)))
-  (make-an/graph
-   :matrix (an/graph-make-component-graph nodes graph num-components)
-   :nodes (an/graph-make-component-nodes nodes num-components))))
+    (make-an/graph
+     :type 'matrix
+     :matrix (an/graph-make-component-graph nodes graph num-components)
+     :nodes (an/graph-make-component-nodes nodes num-components))))
 
 (defun an/graph-make-component-graph(nodes graph num-components)
   "A component graph is a directed acyclic graph which summarises
@@ -324,8 +367,6 @@ component in the graph."
   (if (an/graph-matrix g)
       (setf (an/graph-matrix g) (matrix-graph/reverse (an/graph-matrix g)))
     (setf (an/graph-adj-list g) (edge-graph/reverse (an/graph-adj-list g)))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency Matrix Helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -351,6 +392,13 @@ then (j,i) is an edge in reverse(G)"
         for pos = 0 then (+  pos 1)
         if neighbours-p collect (aref nodes pos)))
 
+(defun matrix-graph:add-directed-edge (graph  i j)
+  (table/setf (an/graph-matrix graph)  i j t))
+
+(defun matrix-graph:add-undirected-edge (graph  i j)
+  (matrix-graph:add-directed-edge graph i j)
+  (matrix-graph:add-directed-edge graph j i))
+
 (defun graph/make-nodes(num)
   "Returns a vector of sat/nodes with increasing sequence numbers "
   (g/make-vector num (lambda(i) (make-sat/node :number i))))
@@ -363,7 +411,7 @@ then (j,i) is an edge in reverse(G)"
 (cl-defun an/graph:dfs-visit-graph (g  &key (traverse-order nil) (post-dfs nil) (pre-vist nil) (post-visit nil))
   "Visit a complete graph using dfs. Restarting on each
 exhaustion, assumes node is vector."
-  (let ((nodes (an/graph-nodes g)))        
+  (let ((nodes (an/graph-nodes g)))
     (an/graph:nodes-clear-visited nodes)
     (loop for node across
           (if traverse-order
@@ -425,7 +473,7 @@ component numbers till each component is exhausted.
 3. Returns the number of components found."
   (lexical-let* ((cur-component-number 0)
                  (dfs-post-order (an/graph:dfs-post-order g)))
-    
+
     ;; Redo dfs this time going through reverse graph in node finish order
     (message "******Start Computing Component Number ********** ")
     (an/graph-reverse g)
@@ -456,12 +504,12 @@ component numbers till each component is exhausted.
 
 (defun an/edge-graph:parse-edges (relations)
   "Parse relation lists into a directed adjanceny list :
-eg.  '([1 2] [2 3])."  
+eg.  '([1 2] [2 3])."
   (let* ((max-vertex
-         (loop for rel in relations
-               for first-vertex = (aref rel 0)
-               for second-vertex = (aref rel 1)
-               maximize (max first-vertex second-vertex)))
+          (loop for rel in relations
+                for first-vertex = (aref rel 0)
+                for second-vertex = (aref rel 1)
+                maximize (max first-vertex second-vertex)))
          (num-vertex max-vertex)
          (graph      (edge-graph/make num-vertex)))
     (loop for rel in relations
