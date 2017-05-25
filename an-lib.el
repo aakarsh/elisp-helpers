@@ -28,12 +28,10 @@
 (defun an/string:trim (str)
   (an/string:rtrim (an/string:ltrim str)))
 
-
 (defun an/string:split (str &optional sep omit-nulls trim)
   (if (not sep)
       (setf  sep "\\s+"))
    (split-string str sep omit-nulls trim))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; list helpers
@@ -420,13 +418,13 @@ exhaustion, assumes node is vector."
           (if (not (an/graph:node-visited node))
               (progn
                 (message "Call dfs-visit :" (an/graph:node-number node))
-                (an/graph:dfs-visit g node :pre-visit pre-vist :post-visit post-visit)
+                (an/graph:dfs-visit g nil node :pre-visit pre-vist :post-visit post-visit)
                 (if post-dfs
                     (funcall post-dfs g node)))))
     (an/graph:nodes-clear-visited nodes)))
 
 
-(cl-defun an/graph:dfs-visit(g  node  &key (pre-visit nil) (post-visit nil))
+(cl-defun an/graph:dfs-visit(g parent node &key (pre-visit nil) (post-visit nil))
   "Runs dfs on a `graph' represented by and adjaceny matrix of
 vectors, `nodes' is a of nodes containing auxiliary information
 about graph nodes. `node' is the node to visit. `pre-vist' and
@@ -440,7 +438,7 @@ after visiting `node`. "
     (setf (an/graph:node-visited node) 'visiting)
     (if pre-visit
         (progn
-          (funcall pre-visit g  node)))
+          (funcall pre-visit g parent node)))
     (loop for node in (an/graph-neighbours g initial-node)
           ;;(matrix-graph/neighbours initial-node graph nodes)
           finally
@@ -448,11 +446,11 @@ after visiting `node`. "
             (message "Finished Visiting : %d , %s" (an/graph:node-number initial-node) initial-node)
             (setf (an/graph:node-visited initial-node) 'visited)
             (if post-visit
-                (funcall post-visit g initial-node)))
+                (funcall post-visit g parent initial-node)))
 
           if (not (an/graph:node-visited node))
           do
-          (an/graph:dfs-visit g node :post-visit post-visit :pre-visit  pre-visit)
+          (an/graph:dfs-visit g initial-node node :post-visit post-visit :pre-visit pre-visit)
           (setf (an/graph:node-visited node) 'visited)))))
 
 
@@ -460,7 +458,7 @@ after visiting `node`. "
   "Computes the ordering of nodes, from last to finish to first to finish"
   (let ((node-finish-order '()))
     (an/graph:dfs-visit-graph g
-                         :post-visit (lambda (g node)
+                         :post-visit (lambda (g p node)
                                        (push node node-finish-order)))
     (an/vector-list node-finish-order)))
 
@@ -479,7 +477,7 @@ component numbers till each component is exhausted.
     (an/graph-reverse g)
     (an/graph:dfs-visit-graph g
      :traverse-order dfs-post-order
-     :post-visit (lambda (g nd)
+     :post-visit (lambda (g p nd)
                    (setf (an/graph:node-component nd) cur-component-number)
                    (message "assign-components : %d component: %d" (an/graph:node-number nd) (an/graph:node-component nd)))
      :post-dfs (lambda (g node)
@@ -526,6 +524,5 @@ eg.  '([1 2] [2 3])."
 
 (defun edge-graph/reverse (graph)
   (error "Not impelemnted"))
-
 
 (provide 'an-lib)
