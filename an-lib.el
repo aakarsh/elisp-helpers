@@ -359,7 +359,7 @@ component in the graph."
 (defun an/graph-neighbours(graph node)
   (if (an/graph-matrix graph)
       (matrix-graph/neighbours node (an/graph-matrix graph) (an/graph-nodes graph))
-    (edge-graph/neighbours node (an/graph-adj-list graph))))
+    (edge-graph/neighbours node (an/graph-adj-list graph)  (an/graph-nodes graph))))
 
 (defun an/graph-reverse (g)
   (if (an/graph-matrix g)
@@ -406,7 +406,7 @@ then (j,i) is an edge in reverse(G)"
   (loop for node across nodes do
         (setf (an/graph:node-visited node) nil)))
 
-(cl-defun an/graph:dfs-visit-graph (g  &key (traverse-order nil) (post-dfs nil) (pre-vist nil) (post-visit nil))
+(cl-defun an/graph:dfs-visit-graph (g  &key (traverse-order nil) (post-dfs nil) (pre-visit nil) (post-visit nil))
   "Visit a complete graph using dfs. Restarting on each
 exhaustion, assumes node is vector."
   (let ((nodes (an/graph-nodes g)))
@@ -418,7 +418,7 @@ exhaustion, assumes node is vector."
           (if (not (an/graph:node-visited node))
               (progn
                 (message "Call dfs-visit :" (an/graph:node-number node))
-                (an/graph:dfs-visit g nil node :pre-visit pre-vist :post-visit post-visit)
+                (an/graph:dfs-visit g nil node :pre-visit pre-visit :post-visit post-visit)
                 (if post-dfs
                     (funcall post-dfs g node)))))
     (an/graph:nodes-clear-visited nodes)))
@@ -427,7 +427,7 @@ exhaustion, assumes node is vector."
 (cl-defun an/graph:dfs-visit(g parent node &key (pre-visit nil) (post-visit nil))
   "Runs dfs on a `graph' represented by and adjaceny matrix of
 vectors, `nodes' is a of nodes containing auxiliary information
-about graph nodes. `node' is the node to visit. `pre-vist' and
+about graph nodes. `node' is the node to visit. `pre-visit' and
 `post-visit' are optional key word callbacks called before and
 after visiting `node`. "
   (let ((nodes (an/graph-nodes g)))
@@ -494,7 +494,7 @@ component numbers till each component is exhausted.
   (make-vector size nil))
 
 (defun an/edge-graph:add-directed-edge (eg i j)
-  (push j (aref eg i)))
+  (push j (aref (an/graph-adj-list eg) i)))
 
 (defun an/edge-graph:add-undirected-edge (eg i j)
   (an/edge-graph:add-directed-edge eg i j)
