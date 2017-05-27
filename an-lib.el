@@ -291,6 +291,12 @@ and rest of the lines."
   (start-time -1)
   (finish-time -1))
 
+(defun an/relations:decrement (relations)
+  (loop for r in relations
+        for v1  = (- (aref r 0) 1)
+        for v2  = (- (aref r 1) 1)
+        collect (vector v1 v2)))
+
 (defun an/relations:max-member (relations)
   "Returns the maximum vertex in list of relations a list of two
 element vectors."
