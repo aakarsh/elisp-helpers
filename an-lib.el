@@ -186,10 +186,10 @@ and rest of the lines."
   `(an/file:map-over-file
     ,in-file
     (lambda (,count-var ,line-var)
-      (cond       
-       ((= i 0) ,first)
-       ,@(if second
-             `((= i 1) ,second))       
+      (cond
+       ((= ,count-var 0) ,first)
+       ,(if second
+             `((= ,count-var 1) ,second))
        (t ,rest)))))
 
 
@@ -307,7 +307,7 @@ a list of vector pairs of vertices."
          (make-an/graph
           :type type
           :nodes (an/graph:make-nodes num-vertices))))
-    (an/graph:init-edge g)    
+    (an/graph:init-edge g)
     (loop for rel in relations
           for first-vertex  = (aref rel 0) ;;(-  (aref rel 0) 1)
           for second-vertex = (aref rel 1) ;;(-  (aref rel 1) 1)
@@ -336,7 +336,7 @@ a list of vector pairs of vertices."
    ((eq (an/graph-type graph) 'adj-list)
     (setf (an/graph-adj-list graph)
           (edge-graph/make (length (an/graph-nodes graph)))))
-      
+
    ((eq (an/graph-type graph) 'matrix )
     (setf (an/graph-matrix graph )
           (matrix-graph/make (length (an/graph-nodes graph)))))))
