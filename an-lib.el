@@ -189,7 +189,7 @@ and rest of the lines."
       (cond       
        ((= i 0) ,first)
        ,@(if second
-             ((= i 1) ,second))       
+             `((= i 1) ,second))       
        (t ,rest)))))
 
 
