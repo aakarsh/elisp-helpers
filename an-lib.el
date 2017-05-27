@@ -176,6 +176,23 @@
           for current-line in (an/buffer:fetch-lines num-lines)
           for i = 0 then (+ i 1) do
           (funcall  f i current-line))))
+
+
+(cl-defmacro an/parse-over-file(in-file (line,count)  => (line-var,count-var)
+                                        &key (first nil) (second nil) (rest nil))
+  "Tries to make file mapping easier to read. specify variables
+to bind do line and count, along with parsers for first,second,
+and rest of the lines."
+  `(an/file:map-over-file
+    ,in-file
+    (lambda (,count-var ,line-var)
+      (cond       
+       ((= i 0) ,first)
+       ,@(if second
+             ((= i 1) ,second))       
+       (t ,rest)))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shell helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -282,7 +299,7 @@ element vectors."
         for second-vertex = (aref rel 1)
         maximize (max first-vertex second-vertex)))
 
-(defun an/graph:make(type num-vertices relations )
+(cl-defun an/graph:make(type num-vertices relations &key (edge-type nil))
   "Construct a graph with underlying data structure to use
 sepcified by type 'matrix 'adj-list. Relations are specified as
 a list of vector pairs of vertices."
@@ -295,7 +312,9 @@ a list of vector pairs of vertices."
           for first-vertex  = (aref rel 0) ;;(-  (aref rel 0) 1)
           for second-vertex = (aref rel 1) ;;(-  (aref rel 1) 1)
           do
-          (an/graph:add-directed-edge g first-vertex second-vertex))
+          (if (eq edge-type 'undirected )
+              (an/graph:add-undirected-edge g first-vertex second-vertex)
+              (an/graph:add-directed-edge g first-vertex second-vertex)))
     g))
 
 (defun an/graph:add-directed-edge (graph i j )
