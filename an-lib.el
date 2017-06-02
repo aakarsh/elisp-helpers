@@ -1,6 +1,8 @@
 (require 'cl)
 (require 'dash)
 
+;; TODO: convert this file into literate syntax
+;;g
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; string helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -56,9 +58,52 @@
               (an/list:filter fn (cdr l)))
       (an/list:filter fn (cdr l)))))
 
+(defun an/list:filter-sorted (ls filter)
+  "Takes two sorted lists and filters l removing elements
+occuring in filter"
+  (if (not ls)
+      nil
+    (if (not filter)
+        ls
+      (let ((head (car ls))
+            (tail (cdr ls))
+            (filter-head (car filter))
+            (filter-tail (cdr filter)))
+        (cond
+         ((eq head filter-head)
+          (an/list-filter-sorted tail filter))
+         ((> head filter-head)
+          (an/list-filter-sorted ls filter-tail))
+         ((< head filter-head)
+          (cons head (an/list-filter-sorted tail filter))))))))
+
+(defmacro an/list:extend (list values)
+  `(setf ,list (append ,list ,values)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Buffer Markers
+;; Just add the `an/maker to your buffer and cycle
+;; between thier postitions.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defvar an/marker "@@")
+
+(defun an/find-marker()
+    "Find open buffer "
+  (interactive)
+  (loop
+   for b in (buffer-list) do
+   (with-current-buffer b
+     (goto-char 0)
+     (let ((s  (search-forward an/marker nil t)))
+       (if s
+           (goto-char s))))))
+
+
+(global-set-key (kbd "C-c m")  'an/find-marker)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; buffer helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun g/vector-list(ls)
   (loop with v = (make-vector (length ls) 0)
         for l in ls
@@ -272,7 +317,19 @@ and rest of the lines."
 (defun table/swap-rows(table r1 r2)
   (loop for c from 0 below (g/table-ncols table) do
         (an/swapf (table/at table r1 c) (table/at table r2 c))))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Poor mans itertools
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun an/iter:combinations (n)
+  "Generates a set of pairs of $n$ numbers."
+  (let ((pairs '()))
+    (loop for i from 0 below n  do
+          (setf pairs
+                (append
+                 (loop for j from (+ 1 i) below n
+                       collect (list  i j))
+                                pairs)))
+    pairs))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Graphs - some collections of graph helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -284,9 +341,9 @@ and rest of the lines."
 
 (defstruct an/graph:node
   number
-  ;; (neighbours nil) use external ds for these
   (data nil)
   (component nil)
+  (color nil)
   (visited nil)
   (start-time -1)
   (finish-time -1))
@@ -390,6 +447,12 @@ component in the graph."
   (if (an/graph-matrix g)
       (setf (an/graph-matrix g) (matrix-graph/reverse (an/graph-matrix g)))
     (setf (an/graph-adj-list g) (edge-graph/reverse (an/graph-adj-list g)))))
+
+(defun an/graph-compliment (g)
+  (if (an/graph-matrix g)
+      (error "Can't complement matrix graph for now!")
+    (setf (an/graph-adj-list g) (edge-graph/compliment g))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency Matrix Helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -547,7 +610,87 @@ eg.  '([1 2] [2 3])."
          for neighbour in (aref edge-graph node-number)
          collect (aref nodes neighbour)))
 
+
+;; if it is painful then its an opportunity to learn something
 (defun edge-graph/reverse (graph)
+
+  ;; (loop for node in (an/graph-nodes graph) do
+  ;;       (loop for neighbour in (an/graph-neighbours graph node) do
+
+  ;;             ))
+
   (error "Not impelemnted"))
+
+
+(defun an/graph-not-neighbours (graph node)
+  (let* ((nodes  (an/graph-nodes graph))
+         (size  (length nodes))
+         (non-neighbours '() )))
+  (setf non-neighbours  (an/list:filter-sorted
+                         (number-sequence 0 (- size 1))
+                         (mapcar 'an/graph:node-number (an/graph-neighbours graph node))))
+  (loop for i in non-neighbours
+        collect (aref nodes i)))
+
+
+
+(defun edge-graph/compliment (graph)
+  "Compliments a graph but does avoids creating any self loops"
+  (loop
+   with nodes = (an/graph-nodes graph)
+   with size = (length nodes)
+   with adjacency-list = (make-vector size '())
+   for node across (an/graph-nodes graph)
+   for node-number =  (an/graph:node-number node)
+   finally (return adjacency-list)
+   do
+   (loop for non-neighbour in (an/graph-not-neighbours graph node)
+         for non-neighbour-number = (an/graph:node-number non-neighbour)
+         do
+         (if (not (eq node-number non-neighbour-number)) ;; delete-trailing-nodes
+             (push non-neighbour-number (aref adjacency-list  node-number))))
+   (sort (aref adjacency-list node-number) '<)
+   ))
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Run SAT Solver(minisat) on a set of clauses If problem can be
+;; expressed as a boolean satisfiablilty problem
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun an/run-minisat-clauses (num-clauses num-variables out-clauses)
+  (with-current-buffer (get-buffer-create "three-color.in")
+   (an/buffer:clear)
+   (insert (format  "p cnf %3d %3d\n"  num-clauses num-variables))
+   (loop for clause in out-clauses do
+         (insert  (format "%s %3d\n"
+                          (loop for elem in clause concat (concat elem " "))
+                          0)))
+   (write-file "/tmp/three-color.in" nil)
+   (shell-command "minisat /tmp/three-color.in /tmp/three-color.out ")
+
+   (an/minisat-parse-output "/tmp/three-color.out")))
+
+(defun an/minisat-satisfiable (instance)
+  (aref instance 0))
+
+(defun an/minisat-clauses (instance)
+  (aref instance 1))
+
+(defun an/minisat-parse-output (input-file)
+  (let ((satisfiable nil)
+        (clauses '()))
+    (an/parse-over-file
+     input-file
+     (line,count) => (l,i)
+     :first
+     (if (equal "SAT" l)
+         (setf satisfiable t)
+       (message "Could not satisfy the conditions "))
+     :second
+     (setf clauses (mapcar 'an/element-decode (an/buffer:line-to-numbers l))))
+    (vector satisfiable clauses )))
 
 (provide 'an-lib)
