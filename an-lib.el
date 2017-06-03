@@ -679,7 +679,6 @@ eg.  '([1 2] [2 3])."
 
 (defun edge-graph/compliment (graph)
   "Compliments a graph but does avoids creating any self loops"
-;;  (message "Adjacency Before Compliments : %s" (an/graph-adj-list graph))
   (loop
    with nodes = (an/graph-nodes graph)
    with size = (length nodes)
@@ -687,22 +686,19 @@ eg.  '([1 2] [2 3])."
    for node across (an/graph-nodes graph)
    for node-number =  (an/graph:node-number node)
    finally (return (progn
-;;                     (message "Adjacency After Compliment :%s" adjacency-list)
+
                      adjacency-list))
    do
-;;   (message "adjacency-list[%d]: %s non-neighbours: %s" node-number adjacency-list
 
-            (mapcar 'an/graph:node-number (an/graph-not-neighbours graph node)) )
    (loop for non-neighbour in (an/graph-not-neighbours graph node)
          for non-neighbour-number = (an/graph:node-number non-neighbour)
          do
          (message "adjacency-list[%d,%d]: %s" node-number non-neighbour-number adjacency-list)
          (if (not (eq node-number non-neighbour-number)) ;; delete-trailing-nodes
              (push non-neighbour-number (aref adjacency-list  node-number))))
-  ;; (message "before sort: adjacency-list[%d]: %s" node-number  adjacency-list)
-   (setf  (aref adjacency-list node-number)  (sort (aref adjacency-list node-number) '<))
-;;   (message "after sort: adjacency-list[%d]: %s" node-number  adjacency-list)
-   ))
+
+   (setf  (aref adjacency-list node-number)  (sort (aref adjacency-list node-number) '<))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
