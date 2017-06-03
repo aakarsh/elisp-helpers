@@ -16,7 +16,7 @@
   (let ((r ""))
   (while (> n 0)
     (an/string:concat r c)
-    (setq n (- n 1)))r))
+    (setq n (- n 1))) r))
 
 (defun an/string:ltrim (str)
   (let ((trim-pos (string-match "\\s +$" str)))
@@ -119,7 +119,6 @@ sorted."
 (defun an/vector:list (vec)
   (loop for i across vec
         collect i))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffer Markers
 ;; Just add the `an/maker to your buffer and cycle
@@ -661,25 +660,22 @@ eg.  '([1 2] [2 3])."
          collect (aref nodes neighbour)))
 
 
-;; if it is painful then its an opportunity to learn something
 (defun edge-graph/reverse (graph)
-
-  ;; (loop for node in (an/graph-nodes graph) do
-  ;;       (loop for neighbour in (an/graph-neighbours graph node) do
-
-  ;;             ))
-
   (error "Not impelemnted"))
 
 (defun an/graph-not-neighbours (graph node)
   (let* ((nodes  (an/graph-nodes graph))
          (size  (length nodes))
-         (non-neighbours '() )))
-  (setf non-neighbours  (an/list:filter-sorted
-                         (number-sequence 0 (- size 1))
-                         (mapcar 'an/graph:node-number (an/graph-neighbours graph node))))
-  (loop for i in non-neighbours
-        collect (aref nodes i)))
+         (non-neighbours '() ))
+    (setf non-neighbours  (an/list:filter-sorted
+                           (number-sequence 0 (- size 1))
+                           (mapcar 'an/graph:node-number (an/graph-neighbours graph node))))    
+  
+    (loop
+     with node-number = (an/graph:node-number node)
+     for i in non-neighbours
+     if (and i  (not (equal i node-number)))
+          collect (aref nodes i))))
 
 (defun edge-graph/compliment (graph)
   "Compliments a graph but does avoids creating any self loops"
@@ -694,14 +690,16 @@ eg.  '([1 2] [2 3])."
 ;;                     (message "Adjacency After Compliment :%s" adjacency-list)
                      adjacency-list))
    do
-;;   (message "adjacency-list[%d]: %s" node-number adjacency-list)
+;;   (message "adjacency-list[%d]: %s non-neighbours: %s" node-number adjacency-list
+
+            (mapcar 'an/graph:node-number (an/graph-not-neighbours graph node)) )
    (loop for non-neighbour in (an/graph-not-neighbours graph node)
          for non-neighbour-number = (an/graph:node-number non-neighbour)
          do
-;;         (message "adjacency-list[%d,%d]: %s" node-number non-neighbour-number adjacency-list)
+         (message "adjacency-list[%d,%d]: %s" node-number non-neighbour-number adjacency-list)
          (if (not (eq node-number non-neighbour-number)) ;; delete-trailing-nodes
              (push non-neighbour-number (aref adjacency-list  node-number))))
-;;   (message "before sort: adjacency-list[%d]: %s" node-number  adjacency-list)
+  ;; (message "before sort: adjacency-list[%d]: %s" node-number  adjacency-list)
    (setf  (aref adjacency-list node-number)  (sort (aref adjacency-list node-number) '<))
 ;;   (message "after sort: adjacency-list[%d]: %s" node-number  adjacency-list)
    ))
@@ -765,7 +763,8 @@ a vector."
     ;; Relabel variables to reduce the number of passed to sat solver.
     (setf minisat-variable-mapping variable-mapping)
     (setf minisat-variable-index-map reverse-hash)    
-    
+    (message "variable-map: %s" minisat-variable-mapping)
+    (message "variable-inx: %s" minisat-variable-index-map)
     (with-current-buffer (get-buffer-create "minisat.in")
       (an/buffer:clear)
       (insert (format  "p cnf %3d %3d\n"  num-clauses num-variables))
