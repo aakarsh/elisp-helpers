@@ -58,35 +58,46 @@
               (an/list:filter fn (cdr l)))
       (an/list:filter fn (cdr l)))))
 
-(defun an/list:dedup-sorted (ls)
-  "Remove consequetive duplicates for a list, will produce unique
-list on sorted list."
-  (if (or  (not ls) (equal (length ls ) 1))
-      ls
-    (let ((first (car ls))
-          (second (cadr ls)))
-      (if (equal first second)
-          (an/list:dedup-sorted  (cdr ls))
-        (cons first (an/list:dedup-sorted (cdr ls)))))))
+
+
+(defun an/list:dedup-sorted(ls)
+  "Non-recursive variant of depulicating of sorted list. Works be
+eliminating equal neighbours "
+  (loop  with prev = nil
+         with retval = '()
+         finally (return (nreverse retval))
+         for l in ls do
+         (if (not  (equal  prev l))
+             (push l retval))
+         (setf prev l)))
+
 
 (defun an/list:filter-sorted (ls filter)
-  "Takes two sorted lists and filters l removing elements
-occuring in filter"
-  (if (not ls)
-      nil
-    (if (not filter)
-        ls
-      (let ((head (car ls))
-            (tail (cdr ls))
-            (filter-head (car filter))
-            (filter-tail (cdr filter)))
+  "Called with a list and elements to filter. Both lists are
+sorted."
+  (let ((filter-head nil)
+        (retval '())
+        (cur nil))    
+    (while ls      
+      (if (not filter)
+          (while ls
+            (push cur retval)
+            (setf ls (cdr ls))
+            (setf cur (car ls)))        
+        (setf filter-head (car filter))
+        ;; no filter just add all elements        
+        (setf cur (car ls))      
         (cond
-         ((eq head filter-head)
-          (an/list-filter-sorted tail filter))
-         ((> head filter-head)
-          (an/list-filter-sorted ls filter-tail))
-         ((< head filter-head)
-          (cons head (an/list-filter-sorted tail filter))))))))
+         ((equal  cur filter-head)
+          (setf ls (cdr ls)))       
+         ((< cur filter-head ) ;; current is less than 
+          (push cur retval)    ;; add current
+          (setf ls (cdr ls)))       
+         ((> cur filter-head)
+          (while (and filter (> cur filter-head))
+            (setf filter (cdr filter))
+            (setf filter-head (car filter)))))))
+    (nreverse retval)))
 
 (defmacro an/list:extend (list values)
   `(setf ,list (append ,list ,values)))
@@ -779,7 +790,8 @@ a vector."
          (setf satisfiable t)
        (message "Could not satisfy the conditions "))
      :second
-     (setf clauses  (mapcar 'an/minisat-decode (an/list:drop-last (an/vector:list (an/buffer:line-to-numbers l))))))    
+     (if satisfiable
+         (setf clauses  (mapcar 'an/minisat-decode (an/list:drop-last (an/vector:list (an/buffer:line-to-numbers l)))))))
     (vector satisfiable clauses )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
