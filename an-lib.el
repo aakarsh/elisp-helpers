@@ -58,6 +58,17 @@
               (an/list:filter fn (cdr l)))
       (an/list:filter fn (cdr l)))))
 
+(defun an/list:dedup-sorted (ls)
+  "Remove consequetive duplicates for a list, will produce unique
+list on sorted list."
+  (if (or  (not ls) (equal (length ls ) 1))
+      ls
+    (let ((first (car ls))
+          (second (cadr ls)))
+      (if (equal first second)
+          (an/list:dedup-sorted  (cdr ls))
+        (cons first (an/list:dedup-sorted (cdr ls)))))))
+
 (defun an/list:filter-sorted (ls filter)
   "Takes two sorted lists and filters l removing elements
 occuring in filter"
@@ -79,6 +90,24 @@ occuring in filter"
 
 (defmacro an/list:extend (list values)
   `(setf ,list (append ,list ,values)))
+
+(defun an/list:take (ls n)
+  (cond
+   ((not ls) nil)
+   ((<= n 0) nil)
+   (t         (cons (car ls)
+                    (an/list:take (cdr ls) (- n 1) )))))
+
+(defun an/list:drop (ls n)
+  (let ((take (- (length ls) n)))
+    (an/list:take ls take)))
+
+(defun an/list:drop-last (ls)
+  (an/list:drop ls 1 ))
+
+(defun an/vector:list (vec)
+  (loop for i across vec
+        collect i))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffer Markers
@@ -158,7 +187,7 @@ occuring in filter"
 
 (defun an/buffer:num-lines()
   (count-lines (point-min) (point-max)))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun an/vector-list(ls)
   "Converts a list of objects to a vector of objects."
   (loop with v = (make-vector (length ls) 0)
@@ -167,7 +196,17 @@ occuring in filter"
         do (aset v i l)
         finally (return v)))
 
+(defun an/vector-reverse-hash (vector)
+  "Generates a reverse hash from vector elements back to their indices."
+  (loop
+   with retval =  (make-hash-table :test 'equal :size 1024)
+   for elem across vector
+   for i  = 0 then (+  i 1)
+   finally (return retval)
+   do
+   (puthash elem i retval)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun an/buffer:fetch-lines-as-numbers()
   (an/vector-list
@@ -652,26 +691,76 @@ eg.  '([1 2] [2 3])."
    (sort (aref adjacency-list node-number) '<)
    ))
 
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Run SAT Solver(minisat) on a set of clauses If problem can be
 ;; expressed as a boolean satisfiablilty problem
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defstruct an/minisat-output
+  "Output running minsat. "
+  (satisfiable nil)
+  (clauses '()))
 
-(defun an/run-minisat-clauses (num-clauses num-variables out-clauses)
-  (with-current-buffer (get-buffer-create "three-color.in")
-   (an/buffer:clear)
-   (insert (format  "p cnf %3d %3d\n"  num-clauses num-variables))
-   (loop for clause in out-clauses do
-         (insert  (format "%s %3d\n"
-                          (loop for elem in clause concat (concat elem " "))
-                          0)))
-   (write-file "/tmp/three-color.in" nil)
-   (shell-command "minisat /tmp/three-color.in /tmp/three-color.out ")
+(defvar minisat-temp-input-file "/tmp/minisat.in")
+(defvar minisat-temp-output-file "/tmp/minisat.out")
 
-   (an/minisat-parse-output "/tmp/three-color.out")))
+(defvar minisat-variable-mapping '()
+  "A vector which will contain a sorted list of numberic symbols
+  from all the variables passed in ")
+
+(defvar minisat-variable-index-map '()
+  "A hash table mapping encoded variables back to indices in
+  minisat-variable map ")
+
+(defun an/minisat-gen-variable-mapping (clauses)
+  "Sort all the variables passed in and place them uniquely into
+a vector."
+  (let ((variables '()) )    
+    (loop for clause in clauses do
+          (loop for v in clause do
+                (push (abs v ) variables)))
+    (an/vector-list (an/list:dedup-sorted (sort variables '< )))))
+
+(defun an/minisat-encode (v)
+  "Encode variable to its index into variabel mapping. Variable indexed starting with 1"
+  (let ((v-value (abs v))
+        (ret nil))
+    (setf ret (+  (gethash v-value minisat-variable-index-map) 1) )
+    (if (< v 0)
+        (* -1 ret)
+      ret)))
+    
+(defun an/minisat-decode (v)
+  "Decode the variable using the index , assign proper complimentation"
+  (let ((v-value (abs v))
+        (ret nil))
+    (setf v-value (- v-value 1))
+    (setf ret (aref minisat-variable-mapping v-value))
+    (if (<  v 0)
+        (setf ret (* -1 ret)))
+    ret))
+
+(defun an/run-minisat-clauses(out-clauses)
+  "Run minisat instances on a set of variables."
+  (let* ((variable-mapping (an/minisat-gen-variable-mapping out-clauses))
+         (reverse-hash (an/vector-reverse-hash variable-mapping ))
+         (num-variables (length variable-mapping))
+         (num-clauses  (length out-clauses)))
+    
+    ;; Relabel variables to reduce the number of passed to sat solver.
+    (setf minisat-variable-mapping variable-mapping)
+    (setf minisat-variable-index-map reverse-hash)    
+    
+    (with-current-buffer (get-buffer-create "minisat.in")
+      (an/buffer:clear)
+      (insert (format  "p cnf %3d %3d\n"  num-clauses num-variables))
+      (loop for clause in out-clauses do
+            (insert
+             (format "%s %3d\n"
+                     (loop for elem in clause concat (concat (format "%s" (an/minisat-encode elem)) " "))
+                     0)))
+      (write-file minisat-temp-input-file nil)
+      (shell-command (format  "minisat %s %s "  minisat-temp-input-file  minisat-temp-output-file))
+      (an/minisat-parse-output  minisat-temp-output-file))))
 
 (defun an/minisat-satisfiable (instance)
   (aref instance 0))
@@ -690,7 +779,8 @@ eg.  '([1 2] [2 3])."
          (setf satisfiable t)
        (message "Could not satisfy the conditions "))
      :second
-     (setf clauses (mapcar 'an/element-decode (an/buffer:line-to-numbers l))))
+     (setf clauses  (mapcar 'an/minisat-decode (an/list:drop-last (an/vector:list (an/buffer:line-to-numbers l))))))    
     (vector satisfiable clauses )))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (provide 'an-lib)
