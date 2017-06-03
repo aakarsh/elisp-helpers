@@ -770,7 +770,8 @@ a vector."
                      (loop for elem in clause concat (concat (format "%s" (an/minisat-encode elem)) " "))
                      0)))
       (write-file minisat-temp-input-file nil)
-      (shell-command (format  "minisat %s %s "  minisat-temp-input-file  minisat-temp-output-file))
+      (shell-command (format  "minisat %s %s &> /dev/null "
+                              minisat-temp-input-file  minisat-temp-output-file))
       (an/minisat-parse-output  minisat-temp-output-file))))
 
 (defun an/minisat-satisfiable (instance)
