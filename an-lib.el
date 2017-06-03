@@ -685,21 +685,15 @@ eg.  '([1 2] [2 3])."
    with adjacency-list = (make-vector size '())
    for node across (an/graph-nodes graph)
    for node-number =  (an/graph:node-number node)
-   finally (return (progn
-
-                     adjacency-list))
+   finally (return                     adjacency-list)
    do
-
    (loop for non-neighbour in (an/graph-not-neighbours graph node)
          for non-neighbour-number = (an/graph:node-number non-neighbour)
          do
          (message "adjacency-list[%d,%d]: %s" node-number non-neighbour-number adjacency-list)
          (if (not (eq node-number non-neighbour-number)) ;; delete-trailing-nodes
              (push non-neighbour-number (aref adjacency-list  node-number))))
-
    (setf  (aref adjacency-list node-number)  (sort (aref adjacency-list node-number) '<))))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Run SAT Solver(minisat) on a set of clauses If problem can be
