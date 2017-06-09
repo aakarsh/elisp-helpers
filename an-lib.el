@@ -7,11 +7,11 @@
 
 (cl-defun an/set-make (&key ((:init initial-list) nil)
                             ((:size size) 50))
-  "Creates a set which is just a hashtable"  
+  "Creates a set which is just a hashtable"
   (setq retval (make-hash-table :test 'equal :size size ))
   (if initial-list
       (dolist (e initial-list)
-        (an/set-add retval e)))  
+        (an/set-add retval e)))
   retval)
 
 (an/set-make :init '(1 2 3))
@@ -33,7 +33,7 @@ set with the value directly."
   (if (not set)
       nil
     (if (not (hash-table-p set))
-        (equal set value)      
+        (equal set value)
       (gethash value set nil))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -41,11 +41,11 @@ set with the value directly."
 (defun an/string:equalize-line-words (line)
   (let ((max-length 0)
         (new-line "")
-        (words ""))    
+        (words ""))
     (setq words  (split-string line "\s+"))
     (setq max-length
           (loop for word in words
-                maximize (length word) ))    
+                maximize (length word) ))
     (string-join
      (loop for word in words
            collect (format (concat "%" (int-to-string max-length) "s" )  word))
@@ -126,22 +126,22 @@ eliminating equal neighbours "
 sorted."
   (let ((filter-head nil)
         (retval '())
-        (cur nil))    
-    (while ls      
+        (cur nil))
+    (while ls
       (if (not filter)
           (while ls
             (push cur retval)
             (setf ls (cdr ls))
-            (setf cur (car ls)))        
+            (setf cur (car ls)))
         (setf filter-head (car filter))
-        ;; no filter just add all elements        
-        (setf cur (car ls))      
+        ;; no filter just add all elements
+        (setf cur (car ls))
         (cond
          ((equal  cur filter-head)
-          (setf ls (cdr ls)))       
-         ((< cur filter-head ) ;; current is less than 
+          (setf ls (cdr ls)))
+         ((< cur filter-head ) ;; current is less than
           (push cur retval)    ;; add current
-          (setf ls (cdr ls)))       
+          (setf ls (cdr ls)))
          ((> cur filter-head)
           (while (and filter (> cur filter-head))
             (setf filter (cdr filter))
@@ -170,23 +170,28 @@ sorted."
   (loop for i across vec
         collect i))
 
-(cl-defun an/vector:scale (vec scale
+(cl-defun an/vector:map (vec function
                              &key
                              ((:skip  skip-set) nil)
                              ((:in in-set) nil))
-  "Returns a scaled version of a vector, scaling values not in
-skip and if specified scaling values in in-set."  
-  (setq len (length vec))  
+"Maps function over vector returning a new vector with function,
+function will take two arguments the first argument is the value
+of vector and i is the index in the vector "
+  (setq len (length vec))
   (setq ret-vector  (make-vector len nil))
-    
+
+  (if (listp skip-set)
+      (setq skip-set (an/set-make :init skip-set)))
+
+  (if (listp in-set)
+      (setq in-set (an/set-make :init in-set)))
+
   (loop for i from 0 below len do
         (aset ret-vector i (aref vec i) ))
-  
+
   (loop for v across vec
         for i = 0 then (+ i 1)
-        for scaled-value = (if v
-                               (* scale  v)
-                             v)
+        for scaled-value = (funcall function v i)
         finally (return ret-vector)
         if (and
             (if in-set
@@ -196,7 +201,21 @@ skip and if specified scaling values in in-set."
                 (not (an/set-memberp skip-set i))
               t))
         do
-        (aset ret-vector i scaled-value)))
+        (aset ret-vector i
+              scaled-value)))
+
+(cl-defun an/vector:scale (vec scale
+                               &key
+                               ((:skip  skip-set) nil)
+                               ((:in in-set) nil))
+  "Returns a scaled version of a vector, scaling values not in
+skip and if specified scaling values in in-set."
+  (an/vector:map
+   vec
+   (lambda (v i) (if v (* v scale) v))
+   :skip skip-set
+   :in   in-set))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffer Markers
@@ -748,8 +767,8 @@ eg.  '([1 2] [2 3])."
          (non-neighbours '() ))
     (setf non-neighbours  (an/list:filter-sorted
                            (number-sequence 0 (- size 1))
-                           (mapcar 'an/graph:node-number (an/graph-neighbours graph node))))    
-  
+                           (mapcar 'an/graph:node-number (an/graph-neighbours graph node))))
+
     (loop
      with node-number = (an/graph:node-number node)
      for i in non-neighbours
@@ -797,7 +816,7 @@ eg.  '([1 2] [2 3])."
 (defun an/minisat-gen-variable-mapping (clauses)
   "Sort all the variables passed in and place them uniquely into
 a vector."
-  (let ((variables '()) )    
+  (let ((variables '()) )
     (loop for clause in clauses do
           (loop for v in clause do
                 (push (abs v ) variables)))
@@ -811,7 +830,7 @@ a vector."
     (if (< v 0)
         (* -1 ret)
       ret)))
-    
+
 (defun an/minisat-decode (v)
   "Decode the variable using the index , assign proper complimentation"
   (let ((v-value (abs v))
@@ -828,10 +847,10 @@ a vector."
          (reverse-hash (an/vector-reverse-hash variable-mapping ))
          (num-variables (length variable-mapping))
          (num-clauses  (length out-clauses)))
-    
+
     ;; Relabel variables to reduce the number of passed to sat solver.
     (setf minisat-variable-mapping variable-mapping)
-    (setf minisat-variable-index-map reverse-hash)    
+    (setf minisat-variable-index-map reverse-hash)
     (message "variable-map: %s" minisat-variable-mapping)
     (message "variable-inx: %s" minisat-variable-index-map)
     (with-current-buffer (get-buffer-create "minisat.in")
