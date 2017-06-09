@@ -1,8 +1,57 @@
 (require 'cl)
 (require 'dash)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; AN set
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(cl-defun an/set-make (&key ((:init initial-list) nil)
+                            ((:size size) 50))
+  "Creates a set which is just a hashtable"  
+  (setq retval (make-hash-table :test 'equal :size size ))
+  (if initial-list
+      (dolist (e initial-list)
+        (an/set-add retval e)))  
+  retval)
+
+(an/set-make :init '(1 2 3))
+
+(defun an/set-add (set  &rest values)
+  (loop for value in values do
+        (puthash value t set)))
+
+(defun an/set-remove (set  &rest values)
+  "Remove a value from set"
+  (loop for value in values do
+        (remhash value set)))
+
+
+
+(defun an/set-memberp (set value)
+  "Check membership in the set, for single values we just compare
+set with the value directly."
+  (if (not set)
+      nil
+    (if (not (hash-table-p set))
+        (equal set value)      
+      (gethash value set nil))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun an/string:equalize-line-words (line)
+  (let ((max-length 0)
+        (new-line "")
+        (words ""))    
+    (setq words  (split-string line "\s+"))
+    (setq max-length
+          (loop for word in words
+                maximize (length word) ))    
+    (string-join
+     (loop for word in words
+           collect (format (concat "%" (int-to-string max-length) "s" )  word))
+     " ")))
+
 ;; TODO: convert this file into literate syntax
-;;g
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; string helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -117,8 +166,38 @@ sorted."
   (an/list:drop ls 1 ))
 
 (defun an/vector:list (vec)
+  "Vector as list"
   (loop for i across vec
         collect i))
+
+(cl-defun an/vector:scale (vec scale
+                             &key
+                             ((:skip  skip-set) nil)
+                             ((:in in-set) nil))
+  "Returns a scaled version of a vector, scaling values not in
+skip and if specified scaling values in in-set."  
+  (setq len (length vec))  
+  (setq ret-vector  (make-vector len nil))
+    
+  (loop for i from 0 below len do
+        (aset ret-vector i (aref vec i) ))
+  
+  (loop for v across vec
+        for i = 0 then (+ i 1)
+        for scaled-value = (if v
+                               (* scale  v)
+                             v)
+        finally (return ret-vector)
+        if (and
+            (if in-set
+                (an/set-memberp in-set i)
+              t)
+            (if skip-set
+                (not (an/set-memberp skip-set i))
+              t))
+        do
+        (aset ret-vector i scaled-value)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Buffer Markers
 ;; Just add the `an/maker to your buffer and cycle
@@ -139,10 +218,10 @@ sorted."
 
 
 (global-set-key (kbd "C-c m")  'an/find-marker)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; buffer helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defun g/vector-list(ls)
   (loop with v = (make-vector (length ls) 0)
         for l in ls
