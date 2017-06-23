@@ -2,8 +2,42 @@
 (require 'dash)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar an/debug:debug t)
+
+(defvar an/debug:cur-level 5)
+
+(cl-defun an/debug:msg (format &rest args &key ((:level debug-level) 0) ((:tag tag ) nil) )
+  "Print debug message into message buffer if debug-level is less
+than current debug level"
+  (if (<= debug-level an/debug:cur-level)
+      (if tag
+          (message (format "[%s]%s"  tag format)  args)
+        (message format args))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; AN set
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun an/set-add! (set  &rest values)
+  (loop for value in values finally (return set) do
+        (puthash value t set)))
+
+(cl-defun an/set-list (set &key ((:sort sort-by) nil))
+  "Set keys as a list"
+  (setq ret-list  (hash-table-keys set))
+  (if sort-by
+      (sort ret-list sort-by )))
+
+(defun an/set-remove! (set  &rest values)
+  "Remove a value from set"
+  (loop for value in values
+        finally (return set) do
+        (remhash value set)))
+
+(defun an/set-replace! (set v1 v2)
+  "Replace v1 with v2"
+  (an/set-add! (an/set-remove! set v1) v2))
+
 
 (cl-defun an/set-make (&key ((:init initial-list) nil)
                             ((:size size) 50))
@@ -11,20 +45,14 @@
   (setq retval (make-hash-table :test 'equal :size size ))
   (if initial-list
       (dolist (e initial-list)
-        (an/set-add retval e)))
+        (an/set-add! retval e)))
   retval)
 
-(an/set-make :init '(1 2 3))
 
-(defun an/set-add (set  &rest values)
-  (loop for value in values do
-        (puthash value t set)))
-
-(defun an/set-remove (set  &rest values)
-  "Remove a value from set"
-  (loop for value in values do
-        (remhash value set)))
-
+(defun an/set-difference (set1 set2)
+  (let ((ret-set (an/set-make (hash-table-keys set1))))
+    (an/set-remove! ret-set (hash-table-keys set2))
+    ret-set))
 
 
 (defun an/set-memberp (set value)
@@ -170,13 +198,45 @@ sorted."
   (loop for i across vec
         collect i))
 
+(defun an/vector:subtract-into (new-vec old-vec index delta)
+  "Updates new vec @index with value of delta + old vec @index "
+  (aset new-vec
+        index
+        (-  (aref old-vec index) delta)))
+
+(defun an/vector:push-head (newelt vec)
+  (let ((retval (make-vector (+ 1  (length vec)) nil) ))
+    (aset retval 0 newelt)
+    (loop for v across vec
+          for i = 1 then (+ i 1)
+          do
+          (aset retval i v))
+    retval))
+
+(defun an/vector:pop-head (vec)
+  (if (equal 0  (length vec))
+      nil
+    (let* ((len  (length vec))
+           (retval (make-vector (- len 1) nil)))
+      (loop for v across vec
+            for i = 0 then (+ i 1)
+            with j = 0
+            if (not  (equal i 0))
+            do
+            (aset retval j v)
+            (incf j))
+      retval)))
+
+
+
 (cl-defun an/vector:map (vec function
                              &key
                              ((:skip  skip-set) nil)
                              ((:in in-set) nil))
 "Maps function over vector returning a new vector with function,
 function will take two arguments the first argument is the value
-of vector and i is the index in the vector "
+of vector and i is the index in the vector."
+
   (setq len (length vec))
   (setq ret-vector  (make-vector len nil))
 
@@ -210,11 +270,8 @@ of vector and i is the index in the vector "
                                ((:in in-set) nil))
   "Returns a scaled version of a vector, scaling values not in
 skip and if specified scaling values in in-set."
-  (an/vector:map
-   vec
-   (lambda (v i) (if v (* v scale) v))
-   :skip skip-set
-   :in   in-set))
+  (an/vector:map vec (lambda (v i) (if v (* v scale) v))
+                 :skip skip-set :in   in-set))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -295,7 +352,34 @@ skip and if specified scaling values in in-set."
 
 (defun an/buffer:num-lines()
   (count-lines (point-min) (point-max)))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun an/make-nil-vector (len)
+  "Make a nil vector length "
+  (make-vector len nil))
+
+(defun an/make-nil-vector-shape (v)
+  "Make nil vector of size of v"
+  (an/make-nil-vector (length v)))
+
+(defun an/make-vector-shape (v init)
+  "Make nil vector of size of v"
+  (make-vector (length v) init))
+
+(defun an/make-nil-table-shape (table)
+  "Make a nil table with shame shape as table"
+  (an/vector:make
+   (length table)
+   (lambda (i)
+     (an/make-nil-vector-shape (aref table i) ))))
+
+(defun an/make-table-shape (table value)
+  (an/vector:make
+   (length table)
+   (lambda (i)
+     (an/make-vector-shape (aref table i) value))))
+
 (defun an/vector-list(ls)
   "Converts a list of objects to a vector of objects."
   (loop with v = (make-vector (length ls) 0)
@@ -315,7 +399,6 @@ skip and if specified scaling values in in-set."
    (puthash elem i retval)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defun an/buffer:fetch-lines-as-numbers()
   (an/vector-list
    (mapcar 'string-to-number
@@ -464,6 +547,30 @@ and rest of the lines."
 (defun table/swap-rows(table r1 r2)
   (loop for c from 0 below (g/table-ncols table) do
         (an/swapf (table/at table r1 c) (table/at table r2 c))))
+
+(defun table/push-column (column table)
+  "Takes vector column and adds it sequentially to the table"
+  (let ((ret-table (make-vector (length table) [])))
+    (loop for row across table
+          for r = 0 then (+ r 1)
+          for table-row = (aref table r)
+          for column-elt = (aref column r)
+          do
+          (aset ret-table r
+                (an/vector:push-head column-elt table-row)))
+    ret-table))
+
+(defun table/pop-column (table)
+  "drops the left most column from the table"
+  (let ((ret-table (make-vector  (length table) [])))
+    (loop for row across table
+          for r = 0 then (+ r 1)
+          for table-row = (aref table r)
+          do
+          (aset ret-table r
+                (an/vector:pop-head table-row)))
+    ret-table))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Poor mans itertools
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
