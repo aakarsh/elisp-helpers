@@ -1,5 +1,30 @@
+;;; -*- lexical-binding: t; -*-
+
 (require 'cl)
 (require 'dash)
+
+;; Some functions here need proper closures 
+(setq lexical-binding t)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; simple predicates
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun positive?(n)
+  "Check that number is positive"
+  (>= n 0))
+
+(defun non-zero-positive? (n)  (> n 0 ))
+
+(defun non-nil? (x) x)
+
+(defun an/and-predicates (&rest predicate-list)
+  "Join predicates such that resulting predicate is true of all
+predicates in predicate list are true, return the and predicate
+as a funciton"
+  (lambda (v)
+    (loop for p in  predicate-list
+          if (not  (funcall p v)) return nil
+          finally return t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -115,6 +140,14 @@ set with the value directly."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; list helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun an/list:vector (ls)
+  (loop with retval = (make-vector (length ls) nil)
+        for l in ls
+        for i = 0 then (+ i 1)
+        finally return retval
+        do
+        (aset retval i l)))
+
 (defun an/list:split (pos list)
   (let ((first) (second list) (count 0 ))
       (while (< count pos)
@@ -193,10 +226,51 @@ sorted."
 (defun an/list:drop-last (ls)
   (an/list:drop ls 1 ))
 
+(defun an/list:find-first (ls &rest predicates)
+  (loop
+   with all-predicates = (apply 'an/and-predicates predicates)
+   for l in ls
+   if (funcall all-predicates l) return l
+   finally return nil))
+
 (defun an/vector:list (vec)
   "Vector as list"
   (loop for i across vec
         collect i))
+
+(defun an/vector:contains? (vec &rest predicates)
+  "Checks that at least one lement in the vector satisfies all predicates in the given list of predicates"
+  (apply 'an/vector:find-first vec predicates))
+
+(defun an/vector:find-first (vec &rest predicates)
+  "Returns index of first element matching predicate"
+    (loop
+     with and-predicate = (apply 'an/and-predicates predicates)
+     for v across vec
+     for idx = 0 then (+ idx 1 )
+     if (funcall and-predicate v) return idx
+     finally return nil))
+
+(defun an/vector:find-min-idx (vec &rest predicates)
+  "Returns the index of smallest element matching predicates "
+  (let ((min nil)
+        (min-idx nil))
+    (loop
+     with predicate = (apply 'an/and-predicates predicates)
+     for elem across vec
+     for i = 0  then (+ i 1)
+     finally (return (list min min-idx))
+     do
+     (when (funcall predicate elem)
+       (when (not min)
+         (setf min elem)
+         (setf min-idx i))
+       (when (> min elem)
+         (setf min elem)
+         (setf min-idx i ))))
+    min-idx))
+
+
 
 (defun an/vector:subtract-into (new-vec old-vec index delta)
   "Updates new vec @index with value of delta + old vec @index "
@@ -497,6 +571,17 @@ and rest of the lines."
     (set-window-buffer w2 b1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Sequence Functions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun an/seq:zip-with-index (seq)
+  (cond
+   ((vectorp seq)  (an/vector:zip-with-index seq))
+   ((listp seq)    (an/vector:zip-with-index seq))))
+
+(defun an/seq:reduce-with-index (vec func)
+  (reduce func (an/seq:zip-with-index vec)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; vectors - helpers for dealing with vectors
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun an/vector:make(length constructor)
@@ -509,6 +594,41 @@ and rest of the lines."
   (an/vector-list
    (mapcar 'string-to-number
            (split-string line " "))))
+
+(defun an/vector:zip-with-index (vec)
+  (loop for v across vec
+        for i = 0 then (+ i 1)
+        collect (list v i)))
+
+(defalias 'an/second 'cadr)
+
+(defun an/pair-min (p1 p2)
+  "Returns the smallest of the pair based on first element"
+  (let ((k1 (car p1))
+        (k2 (car p2)))
+    (if (<= k1 k2)
+        p1
+      p2)))
+
+(defun an/vector:min-index (vec)
+  (an/second
+   (an/seq:reduce-with-index vec 'an/pair-min)))
+
+
+(defun an/vector:times (vec n)
+  "Create a new vector by appending 
+n-copies of vector to itself."
+
+  (loop with retval = (make-vector (* n  (length vec)) nil)
+        for i from 0 below n by (length vec)
+        finally (return retval)
+        do
+        (loop for v across vec
+              for j = 0 then (+ j 1) do
+              (aset retval (+ i j) v))))
+
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; table - helpers for two dimension vector.
@@ -534,6 +654,18 @@ and rest of the lines."
 (defmacro table/at-position(table pos)
   `(table/at ,table  (g/position-row ,pos)
              (g/position-column ,pos)))
+
+(defun table/mapf (table f)
+  (loop for row across table
+        for r = 0 then (+ r 1)
+        do
+        (loop for cell across row
+              for c = 0 then (+ c 1)
+              do
+              (table/setf table r c (funcall cell r c )))))
+
+(defun table/negate (table)
+  (table/mapf table (lambda (elem r c) (* -1 elem))))
 
 (defmacro an/swapf(r1 r2)
   `(let ((temp nil))
@@ -570,6 +702,26 @@ and rest of the lines."
           (aset ret-table r
                 (an/vector:pop-head table-row)))
     ret-table))
+
+(defun table/map-column (table col-id func)
+  "Map function over the column of a table passing in value and
+row-id"
+  (loop for row-id from 0 below (table/nrows table)
+        for value = (table/at table row-id col-id)
+        do
+        (funcall func value row-id)))
+
+
+
+(defun table/column-select (table col-id row-ids)
+  "Returns a vector of length nrows with for a column and specified row-ids"
+  (if (listp row-ids)
+      (setq row-ids (an/list:vector row-ids)))
+  
+  (loop with retval = (make-vector (table/nrows table) nil)
+        for row-id across row-ids
+        do
+        (aset retval row-id (table/At table row-id col-id))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Poor mans itertools
@@ -795,7 +947,6 @@ after visiting `node`. "
           (an/graph:dfs-visit g initial-node node :post-visit post-visit :pre-visit pre-visit)
           (setf (an/graph:node-visited node) 'visited)))))
 
-
 (defun an/graph:dfs-post-order (g)
   "Computes the ordering of nodes, from last to finish to first to finish"
   (let ((node-finish-order '()))
@@ -813,7 +964,6 @@ component numbers till each component is exhausted.
 3. Returns the number of components found."
   (lexical-let* ((cur-component-number 0)
                  (dfs-post-order (an/graph:dfs-post-order g)))
-
     ;; Redo dfs this time going through reverse graph in node finish order
     (message "******Start Computing Component Number ********** ")
     (an/graph-reverse g)
@@ -831,6 +981,7 @@ component numbers till each component is exhausted.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Adjacency List Implementations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun edge-graph/make(size)
   "Constructs a graph represented as list of edge lists "
   (make-vector size nil))
@@ -875,7 +1026,6 @@ eg.  '([1 2] [2 3])."
     (setf non-neighbours  (an/list:filter-sorted
                            (number-sequence 0 (- size 1))
                            (mapcar 'an/graph:node-number (an/graph-neighbours graph node))))
-
     (loop
      with node-number = (an/graph:node-number node)
      for i in non-neighbours
