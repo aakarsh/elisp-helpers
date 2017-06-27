@@ -26,6 +26,9 @@ as a funciton"
           if (not  (funcall p v)) return nil
           finally return t)))
 
+(defun negate (n)
+  (* -1 n))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar an/debug:debug t)
@@ -148,6 +151,21 @@ set with the value directly."
         do
         (aset retval i l)))
 
+(defun an/vector:copy (vec1  start1 vec2 start2   nelems)
+  "Copies from vec1 start position into vec2 at start position n elements"
+  (loop for i from start1 below (+ start1 nelems)
+        for j = start2 then  (+ j 1)
+        do
+        (aset vec2 j (aref vec1 i)))
+  vec2)
+
+(defun an/vector:rshift (vec n)
+  "Right shift the elements of the vector by n elements "
+  (let* ((len (length vec))
+         (retval (make-vector len nil)))
+    (an/vector:copy vec 0 retval  n (- len n))
+    retval))
+
 (defun an/list:split (pos list)
   (let ((first) (second list) (count 0 ))
       (while (< count pos)
@@ -237,6 +255,14 @@ sorted."
   "Vector as list"
   (loop for i across vec
         collect i))
+
+(defun an/vector:init (to-vec from-vec)
+  "Copy values from  from-vec to to-vec"
+  (loop for i from 0 below (length from-vec)
+          do
+          (aset to-vec i (aref from-vec i))))
+
+
 
 (defun an/vector:contains? (vec &rest predicates)
   "Checks that at least one lement in the vector satisfies all predicates in the given list of predicates"
@@ -447,6 +473,13 @@ skip and if specified scaling values in in-set."
    (length table)
    (lambda (i)
      (an/make-nil-vector-shape (aref table i) ))))
+
+(defun an/make-table (nrows ncols value)
+  "Make with given rows and columns"
+  (an/vector:make
+   nrows
+   (lambda (i)
+     (make-vector ncols value))))
 
 (defun an/make-table-shape (table value)
   (an/vector:make
@@ -662,10 +695,15 @@ n-copies of vector to itself."
         (loop for cell across row
               for c = 0 then (+ c 1)
               do
-              (table/setf table r c (funcall cell r c )))))
+              (table/setf table r c
+                          (funcall f cell r c )))))
 
 (defun table/negate (table)
-  (table/mapf table (lambda (elem r c) (* -1 elem))))
+  (table/mapf table
+              (lambda (elem r c)
+                (if elem
+                    (* -1 elem)
+                  elem))))
 
 (defmacro an/swapf(r1 r2)
   `(let ((temp nil))
@@ -703,6 +741,24 @@ n-copies of vector to itself."
                 (an/vector:pop-head table-row)))
     ret-table))
 
+(defun table/pop-row(table row-number)
+  "Returns a new table with the row-number removed"
+  (let* ((nrows (table/nrows table))
+         (ncols (table/ncols table))
+         (retval (an/make-table (- nrows 1) ncols nil)))
+    
+    (loop with rnum = 0
+          for r from 0 below nrows
+          if (not (equal r row-number))
+          do
+          (loop for c from 0 below ncols
+                do
+                (table/setf retval rnum c (table/at table r c) ))
+          (incf rnum))
+
+    retval))
+
+
 (defun table/map-column (table col-id func)
   "Map function over the column of a table passing in value and
 row-id"
@@ -722,6 +778,24 @@ row-id"
         for row-id across row-ids
         do
         (aset retval row-id (table/At table row-id col-id))))
+
+(defun table/init (to-table from-table)
+  (loop with nrows = (table/nrows from-table)
+        with ncols = (table/ncols from-table) 
+        for r from 0 below nrows
+        do
+        (loop for c from 0 below ncols
+              for v = (table/at from-table r c)
+              do
+              (table/setf to-table r c v))))
+
+(defun table/rshift (table n)
+  "Shifts the rows of table right by n elements"
+  (loop for row across table
+            for r = 0 then (+ r 1) 
+            do
+            (aset table r (an/vector:rshift (aref table r) nrows))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Poor mans itertools
@@ -1144,5 +1218,7 @@ a vector."
          (setf clauses  (mapcar 'an/minisat-decode (an/list:drop-last (an/vector:list (an/buffer:line-to-numbers l)))))))
     (vector satisfiable clauses )))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 (provide 'an-lib)
