@@ -1,6 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 
 (require 'cl)
+(require 'ert)
 (require 'dash)
 
 ;; Some functions here need proper closures 
@@ -65,6 +66,14 @@ than current debug level"
 (defun an/set-replace! (set v1 v2)
   "Replace v1 with v2"
   (an/set-add! (an/set-remove! set v1) v2))
+
+(ert-deftest test-an/set-replace! ()
+  "Test set replacement"
+  (setq s (an/set-make :init '(0 1 2)) )
+  (an/set-replace! s 2 3 )
+  (an/set-list s :sort '<)
+  (should  (an/set-memberp s 3))
+  (should  (not (an/set-memberp s 2))))
 
 
 (cl-defun an/set-make (&key ((:init initial-list) nil)
@@ -304,11 +313,22 @@ sorted."
         index
         (-  (aref old-vec index) delta)))
 
+
 (defun an/vector:push-head (newelt vec)
   (let ((retval (make-vector (+ 1  (length vec)) nil) ))
     (aset retval 0 newelt)
     (loop for v across vec
           for i = 1 then (+ i 1)
+          do
+          (aset retval i v))
+    retval))
+
+(defun an/vector:append (vec newelt)
+  (let* ((n (length vec))
+         (retval (make-vector (+ 1  n) nil) ))
+    (aset retval n newelt)
+    (loop for v across vec
+          for i = 0 then (+ i 1)
           do
           (aset retval i v))
     retval))
@@ -326,6 +346,18 @@ sorted."
             (aset retval j v)
             (incf j))
       retval)))
+
+(defun an/vector:equal (v1 v2)
+  (let ((l1 (length v1))
+        (l2 (length v2)))
+    (if (not (equal l1 l2 ))
+        nil
+              (loop for i from 0 below l1
+              for e1 =  (aref v1 i)
+              for e2 =  (aref v2 i)
+              if (not (equal e1 e2)) return nil
+              finally return t))))
+
 
 
 
@@ -729,6 +761,18 @@ n-copies of vector to itself."
           (aset ret-table r
                 (an/vector:push-head column-elt table-row)))
     ret-table))
+
+(defun table/append-column (table column)
+  (let ((ret-table (make-vector (length table) [])))
+    (loop for row across table
+          for r = 0 then (+ r 1)
+          for table-row = (aref table r)
+          for column-elt = (aref column r)
+          do
+          (aset ret-table r
+                (an/vector:append  table-row column-elt)))
+    ret-table))
+
 
 (defun table/pop-column (table)
   "drops the left most column from the table"
