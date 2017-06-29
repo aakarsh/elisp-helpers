@@ -85,6 +85,11 @@ than current debug level"
         (an/set-add! retval e)))
   retval)
 
+(defun an/set-clone (set)
+  "Return a duplicate of given set"
+  (let ((retval (an/set-make) ))    
+    (an/set-add! retval (an/set-list set))
+    retval))
 
 (defun an/set-difference (set1 set2)
   (let ((ret-set (an/set-make (hash-table-keys set1))))
@@ -620,7 +625,6 @@ and rest of the lines."
              `((= ,count-var 1) ,second))
        (t ,rest)))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shell helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -693,11 +697,9 @@ and rest of the lines."
   (an/second
    (an/seq:reduce-with-index vec 'an/pair-min)))
 
-
 (defun an/vector:times (vec n)
   "Create a new vector by appending 
 n-copies of vector to itself."
-
   (loop with retval = (make-vector (* n  (length vec)) nil)
         for i from 0 below n by (length vec)
         finally (return retval)
@@ -709,7 +711,6 @@ n-copies of vector to itself."
 (defun an/vector:aset-all (vec idxs value)
   (loop for idx in idxs do
         (aset vec  idx value)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; table - helpers for two dimension vector.
