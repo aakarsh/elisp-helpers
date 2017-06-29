@@ -706,7 +706,9 @@ n-copies of vector to itself."
               for j = 0 then (+ j 1) do
               (aset retval (+ i j) v))))
 
-
+(defun an/vector:aset-all (vec idxs value)
+  (loop for idx in idxs do
+        (aset vec  idx value)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
