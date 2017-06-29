@@ -333,6 +333,20 @@ sorted."
           (aset retval i v))
     retval))
 
+(cl-defun an/vector:sub-vector (vec start &optional end)
+  (if (not end)
+      (setq end (length vec)))  
+  (let* ((len (- end start )))
+    (if (equal len 0 )
+        []
+      (let ((retval (make-vector len nil)))
+
+        (loop for i from start below end
+              for j = 0 then (+ j 1 ) 
+              do
+              (aset retval j (aref vec i)))
+        retval))))
+
 (defun an/vector:pop-head (vec)
   (if (equal 0  (length vec))
       nil
@@ -772,6 +786,17 @@ n-copies of vector to itself."
           (aset ret-table r
                 (an/vector:append  table-row column-elt)))
     ret-table))
+
+(defun table/sub-table (table n-rows n-cols)
+  "Creates a subtable with n-rows and n-cols form table "
+  (let ((ret-table (an/make-table n-rows n-cols nil )))
+    (loop for r from 0 below n-rows
+          do
+          (loop for c from 0 below n-cols
+                do
+                (table/setf ret-table r c (table/at table r c))))
+    ret-table))
+
 
 
 (defun table/pop-column (table)
