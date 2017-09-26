@@ -4,7 +4,7 @@
 (require 'ert)
 (require 'dash)
 
-;; Some functions here need proper closures 
+;; Some functions here need proper closures
 (setq lexical-binding t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -87,7 +87,7 @@ than current debug level"
 
 (defun an/set-clone (set)
   "Return a duplicate of given set"
-  (let ((retval (an/set-make) ))    
+  (let ((retval (an/set-make) ))
     (an/set-add! retval (an/set-list set))
     retval))
 
@@ -340,14 +340,14 @@ sorted."
 
 (cl-defun an/vector:sub-vector (vec start &optional end)
   (if (not end)
-      (setq end (length vec)))  
+      (setq end (length vec)))
   (let* ((len (- end start )))
     (if (equal len 0 )
         []
       (let ((retval (make-vector len nil)))
 
         (loop for i from start below end
-              for j = 0 then (+ j 1 ) 
+              for j = 0 then (+ j 1 )
               do
               (aset retval j (aref vec i)))
         retval))))
@@ -643,6 +643,7 @@ and rest of the lines."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; window helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun an/windows:swap()
   "Swap buffers in `selected-window' and `other-window'"
   (interactive)
@@ -652,6 +653,9 @@ and rest of the lines."
         (b2 (window-buffer w2)))
     (set-window-buffer w1 b2)
     (set-window-buffer w2 b1)))
+
+;; centralize key bindings
+(global-set-key (kbd "C-x w") 'an/windows:swap)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sequence Functions
@@ -698,7 +702,7 @@ and rest of the lines."
    (an/seq:reduce-with-index vec 'an/pair-min)))
 
 (defun an/vector:times (vec n)
-  "Create a new vector by appending 
+  "Create a new vector by appending
 n-copies of vector to itself."
   (loop with retval = (make-vector (* n  (length vec)) nil)
         for i from 0 below n by (length vec)
@@ -818,7 +822,7 @@ n-copies of vector to itself."
   (let* ((nrows (table/nrows table))
          (ncols (table/ncols table))
          (retval (an/make-table (- nrows 1) ncols nil)))
-    
+
     (loop with rnum = 0
           for r from 0 below nrows
           if (not (equal r row-number))
@@ -845,7 +849,7 @@ row-id"
   "Returns a vector of length nrows with for a column and specified row-ids"
   (if (listp row-ids)
       (setq row-ids (an/list:vector row-ids)))
-  
+
   (loop with retval = (make-vector (table/nrows table) nil)
         for row-id across row-ids
         do
@@ -853,7 +857,7 @@ row-id"
 
 (defun table/init (to-table from-table)
   (loop with nrows = (table/nrows from-table)
-        with ncols = (table/ncols from-table) 
+        with ncols = (table/ncols from-table)
         for r from 0 below nrows
         do
         (loop for c from 0 below ncols
@@ -864,7 +868,7 @@ row-id"
 (defun table/rshift (table n)
   "Shifts the rows of table right by n elements"
   (loop for row across table
-            for r = 0 then (+ r 1) 
+            for r = 0 then (+ r 1)
             do
             (aset table r (an/vector:rshift (aref table r) nrows))))
 
@@ -1250,7 +1254,6 @@ a vector."
          (reverse-hash (an/vector-reverse-hash variable-mapping ))
          (num-variables (length variable-mapping))
          (num-clauses  (length out-clauses)))
-
     ;; Relabel variables to reduce the number of passed to sat solver.
     (setf minisat-variable-mapping variable-mapping)
     (setf minisat-variable-index-map reverse-hash)
@@ -1289,8 +1292,45 @@ a vector."
      (if satisfiable
          (setf clauses  (mapcar 'an/minisat-decode (an/list:drop-last (an/vector:list (an/buffer:line-to-numbers l)))))))
     (vector satisfiable clauses )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Hacks -
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; How to get access to Scala AST ?
+;; TODO 
+(defun balance-lines-token(start end )
+  (interactive "r")
+  (let ((symbol  (thing-at-point 'symbol))
+        (lines  (split-string (buffer-substring-no-properties start end) "\n")))    
+    (loop
+     for line in lines do
+     (loop
+      for columns = (split-string line symbol)
+      for col in columns
+           for width = (length col)
+           for col-fmt = (format "%d\%s" width)
+           do
+           (message col-fmt col)))))
 
+(defun an/buffer-lines (start end)
+  (split-string (buffer-substring-no-properties start end) "\n"))
+
+(defun an/buffer-filter-lines (start end filterp)
+  (interactive "r\nXFilter Function:")
+  (let ((lines (an/buffer-lines start end)))
+    (kill-region start end)
+    (loop for line in lines if (funcall filterp line)
+          do
+          (insert (format "%s\n" line)))))
+
+(defun an/buffer-filter-all-lines (filterp)
+  (interactive "XFilter Function:")
+  (an/buffer-filter-lines (point-min) (point-max) filterp))
+
+(defun an/string-duplicate-parts (line)
+  "sSep"
+  (let ((split  (split-string line "\s+")))
+    (equal (car split) (cadr split))))
 
 (provide 'an-lib)
